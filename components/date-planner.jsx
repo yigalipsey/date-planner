@@ -35,7 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
-import Loader from "@/components/ui/loader";
+import Loader from "./Loader";
 import {
   Dialog,
   DialogContent,

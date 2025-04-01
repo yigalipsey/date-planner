@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
 export async function GET(request) {
@@ -7,22 +6,32 @@ export async function GET(request) {
     const week = parseInt(searchParams.get("week"));
 
     if (!week) {
-      return NextResponse.json(
-        { error: "Week parameter is required" },
+      return Response.json(
+        {
+          success: false,
+          error: "Week parameter is required",
+        },
         { status: 400 }
       );
     }
 
-    console.log("Fetching date for week:", week);
     const { db } = await connectToDatabase();
     const collection = db.collection("dates");
 
-    const dateData = await collection.findOne({ week: week });
-    console.log("Found date data:", dateData);
+    const date = await collection.findOne({ week });
 
-    return NextResponse.json({ date: dateData });
+    return Response.json({
+      success: true,
+      date: date || null,
+    });
   } catch (error) {
-    console.error("Error getting date:", error);
-    return NextResponse.json({ error: "Failed to get date" }, { status: 500 });
+    console.error("Error in get-planner:", error);
+    return Response.json(
+      {
+        success: false,
+        error: "Failed to fetch date",
+      },
+      { status: 500 }
+    );
   }
 }
