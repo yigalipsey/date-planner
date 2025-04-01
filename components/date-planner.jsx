@@ -69,120 +69,64 @@ export function DatePlanner() {
     useState("default");
   const [isIOS, setIsIOS] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
+  const [currentPlanner, setCurrentPlanner] = useState("");
 
-  // Load data from localStorage
+  // Load current week's date from database
   useEffect(() => {
-    const savedHistory = localStorage.getItem("datePlanningHistory");
-    const savedPartnerA = localStorage.getItem("partnerA");
-    const savedPartnerB = localStorage.getItem("partnerB");
-    const savedDateDetailsHistory = localStorage.getItem("dateDetailsHistory");
-    const savedLocation = localStorage.getItem("dateLocation");
-    const savedIsSurpriseLocation = localStorage.getItem("isSurpriseLocation");
+    const loadCurrentDate = async () => {
+      try {
+        console.log("Loading date for week:", currentWeek);
+        const response = await fetch(`/api/get-planner?week=${currentWeek}`);
+        const data = await response.json();
+        console.log("Loaded date data:", data);
 
-    if (savedHistory) {
-      setPlanningHistory(JSON.parse(savedHistory));
-    }
+        if (data.date) {
+          const dateData = data.date;
+          console.log("Found date data:", dateData);
 
-    if (savedPartnerA) {
-      setPartnerA(savedPartnerA);
-    }
+          // Update all the fields from the database
+          setIsPlanned(true);
+          setDateDetails(dateData.dateDetails || "");
+          setDateLocation(dateData.location || "");
+          setIsSurpriseLocation(dateData.location === "הפתעה");
 
-    if (savedPartnerB) {
-      setPartnerB(savedPartnerB);
-    }
+          // Update histories
+          setDateDetailsHistory((prev) => ({
+            ...prev,
+            [currentWeek]: dateData.dateDetails,
+          }));
+          setPlanningHistory((prev) => ({
+            ...prev,
+            [currentWeek]: true,
+          }));
 
-    if (savedDateDetailsHistory) {
-      setDateDetailsHistory(JSON.parse(savedDateDetailsHistory));
-    }
-
-    if (savedLocation) {
-      setDateLocation(savedLocation);
-    }
-
-    if (savedIsSurpriseLocation) {
-      setIsSurpriseLocation(JSON.parse(savedIsSurpriseLocation));
-    }
-
-    // Check if current week is already planned and load date details
-    if (savedHistory) {
-      const history = JSON.parse(savedHistory);
-      setIsPlanned(!!history[currentWeek]);
-    }
-
-    if (savedDateDetailsHistory) {
-      const detailsHistory = JSON.parse(savedDateDetailsHistory);
-      if (detailsHistory[currentWeek]) {
-        setDateDetails(detailsHistory[currentWeek]);
-      } else {
+          // Log what we're setting
+          console.log("Setting state with:", {
+            isPlanned: true,
+            dateDetails: dateData.dateDetails,
+            location: dateData.location,
+            isSurpriseLocation: dateData.location === "הפתעה",
+          });
+        } else {
+          console.log("No date found for week:", currentWeek);
+          // Reset fields if no data found
+          setIsPlanned(false);
+          setDateDetails("");
+          setDateLocation("");
+          setIsSurpriseLocation(false);
+        }
+      } catch (error) {
+        console.error("Error loading date:", error);
+        // Reset fields on error
+        setIsPlanned(false);
         setDateDetails("");
+        setDateLocation("");
+        setIsSurpriseLocation(false);
       }
-    }
-  }, [currentWeek]);
-
-  // Save planning history to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "datePlanningHistory",
-      JSON.stringify(planningHistory)
-    );
-  }, [planningHistory]);
-
-  // Save date details history to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "dateDetailsHistory",
-      JSON.stringify(dateDetailsHistory)
-    );
-  }, [dateDetailsHistory]);
-
-  // Save partner names to localStorage
-  useEffect(() => {
-    localStorage.setItem("partnerA", partnerA);
-    localStorage.setItem("partnerB", partnerB);
-  }, [partnerA, partnerB]);
-
-  // Save location to localStorage
-  useEffect(() => {
-    localStorage.setItem("dateLocation", dateLocation);
-  }, [dateLocation]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "isSurpriseLocation",
-      JSON.stringify(isSurpriseLocation)
-    );
-  }, [isSurpriseLocation]);
-
-  // Load notification settings
-  useEffect(() => {
-    const savedNotificationsEnabled = localStorage.getItem(
-      "notificationsEnabled"
-    );
-    if (savedNotificationsEnabled) {
-      setNotificationsEnabled(JSON.parse(savedNotificationsEnabled));
-    }
-
-    if ("Notification" in window) {
-      setNotificationPermission(Notification.permission);
-    }
-  }, []);
-
-  // Save notification settings
-  useEffect(() => {
-    localStorage.setItem(
-      "notificationsEnabled",
-      JSON.stringify(notificationsEnabled)
-    );
-  }, [notificationsEnabled]);
-
-  // Check if device is iOS
-  useEffect(() => {
-    const checkIsIOS = () => {
-      const userAgent = window.navigator.userAgent.toLowerCase();
-      return /iphone|ipad|ipod/.test(userAgent);
     };
-    setIsIOS(checkIsIOS());
-  }, []);
+
+    loadCurrentDate();
+  }, [currentWeek]);
 
   // Check if running as PWA
   useEffect(() => {
@@ -193,10 +137,16 @@ export function DatePlanner() {
         document.referrer.includes("android-app://")
       );
     };
+
+    const checkIsIOS = () => {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    };
+
+    setIsIOS(checkIsIOS());
     setIsPWA(checkIsPWA());
   }, []);
 
-  const handleMarkPlanned = () => {
+  const handleMarkPlanned = async () => {
     // Check if date details are empty
     if (!dateDetails.trim()) {
       setErrorMessage("חובה להזין פרטי דייט");
@@ -209,15 +159,52 @@ export function DatePlanner() {
       return;
     }
 
-    // If all validations pass, mark as planned
-    setIsPlanned(true);
-    setPlanningHistory((prev) => ({
-      ...prev,
-      [currentWeek]: true,
-    }));
+    try {
+      console.log("Attempting to save date to database...");
+      const dateData = {
+        week: currentWeek,
+        dateDetails: dateDetails,
+        location: isSurpriseLocation ? "הפתעה" : dateLocation,
+        isPlanned: true,
+        planningDate: new Date(),
+        partnerA,
+        partnerB,
+      };
+      console.log("Date data to save:", dateData);
 
-    // Success message
-    setSuccessMessage("הדייט תוכנן בהצלחה! 🎉");
+      // Save planner to database
+      const response = await fetch("/api/save-planner", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(dateData),
+      });
+
+      console.log("Save response status:", response.status);
+      const responseData = await response.json();
+      console.log("Save response data:", responseData);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to save planner: ${responseData.error || "Unknown error"}`
+        );
+      }
+
+      // If all validations pass, mark as planned
+      setIsPlanned(true);
+      setPlanningHistory((prev) => ({
+        ...prev,
+        [currentWeek]: true,
+      }));
+
+      // Success message
+      setSuccessMessage("הדייט תוכנן בהצלחה! 🎉");
+    } catch (error) {
+      console.error("Detailed error in handleMarkPlanned:", error);
+      console.error("Error stack:", error.stack);
+      setErrorMessage(`שגיאה בשמירת המתכנן: ${error.message}`);
+    }
   };
 
   const handleMarkUnplanned = () => {
