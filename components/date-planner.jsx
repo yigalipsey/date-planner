@@ -288,13 +288,18 @@ export function DatePlanner() {
         applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
       });
 
-      await fetch("/api/subscribe", {
+      // Save subscription to server
+      const response = await fetch("/api/subscribe", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ subscription }),
       });
+
+      if (!response.ok) {
+        throw new Error("Failed to save subscription");
+      }
 
       return subscription;
     } catch (error) {
@@ -303,20 +308,70 @@ export function DatePlanner() {
     }
   };
 
+  const sendTestNotification = async () => {
+    try {
+      const response = await fetch("/api/send-notification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: "בדיקת התראות",
+          message: "מעולה! ההתראות עובדות בהצלחה 🎉",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send test notification");
+      }
+
+      const result = await response.json();
+      if (result.sent === 0) {
+        throw new Error("No active subscriptions found");
+      }
+    } catch (error) {
+      console.error("Error sending test notification:", error);
+      throw error;
+    }
+  };
+
   const toggleNotifications = async () => {
     if (!notificationsEnabled) {
+      if (!isPWA) {
+        toast({
+          title: "המלצה",
+          description:
+            "להתראות אמינות יותר, מומלץ להתקין את האפליקציה למסך הבית",
+          duration: 5000,
+        });
+      }
+
       try {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
           const registration = await registerServiceWorker();
           if (registration) {
             await subscribeToPush(registration);
+            // Wait a moment for the subscription to be properly saved
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await sendTestNotification();
+
             setNotificationsEnabled(true);
+            setNotificationPermission("granted");
+
             toast({
               title: "התראות הופעלו",
-              description: "תקבל התראות על דייטים",
+              description: isPWA
+                ? "תקבל התראות על דייטים"
+                : "תקבל התראות על דייטים כל עוד הדפדפן פתוח",
             });
           }
+        } else {
+          toast({
+            title: "לא ניתן להפעיל התראות",
+            description: "נא לאפשר התראות בדפדפן",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         console.error("Error enabling notifications:", error);
@@ -325,6 +380,7 @@ export function DatePlanner() {
           description: "אירעה שגיאה בהפעלת ההתראות. אנא נסה שוב.",
           variant: "destructive",
         });
+        setNotificationsEnabled(false);
       }
     } else {
       setNotificationsEnabled(false);
@@ -341,28 +397,16 @@ export function DatePlanner() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>שבוע {currentWeek}</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push("/notify")}
-                className="flex items-center gap-2"
-              >
-                <Bell className="h-4 w-4" />
-                שלח התראה
-              </Button>
-              <Badge
-                variant={isPlanned ? "default" : "outline"}
-                className={cn(
-                  "mr-2 px-4 py-1.5 text-base font-medium",
-                  isPlanned && "bg-[#34C759] hover:bg-[#34C759]/90",
-                  !isPlanned &&
-                    "bg-red-500 hover:bg-red-600 text-white border-0"
-                )}
-              >
-                {isPlanned ? "מתוכנן" : "לא מתוכנן"}
-              </Badge>
-            </div>
+            <Badge
+              variant={isPlanned ? "default" : "outline"}
+              className={cn(
+                "mr-2 px-4 py-1.5 text-base font-medium",
+                isPlanned && "bg-[#34C759] hover:bg-[#34C759]/90",
+                !isPlanned && "bg-red-500 hover:bg-red-600 text-white border-0"
+              )}
+            >
+              {isPlanned ? "מתוכנן" : "לא מתוכנן"}
+            </Badge>
           </div>
           <CardDescription>
             <div className="flex items-center mt-2">
@@ -397,7 +441,11 @@ export function DatePlanner() {
                 )}
                 <div>
                   <h3 className="text-sm font-medium">התראות</h3>
-                  <p className="text-xs text-slate-500">קבל התראות על דייטים</p>
+                  <p className="text-xs text-slate-500">
+                    {isPWA
+                      ? "קבל התראות על דייטים"
+                      : "קבל התראות (מומלץ להתקין את האפליקציה)"}
+                  </p>
                 </div>
               </div>
               <Switch
