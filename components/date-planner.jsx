@@ -35,6 +35,15 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
+import Loader from "@/components/ui/loader";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Get the current week number
 const getCurrentWeek = () => {
@@ -48,6 +57,94 @@ const getCurrentWeek = () => {
 // Determine who's planning based on week number
 const getPlanner = (weekNumber, partnerA, partnerB) => {
   return weekNumber % 2 === 0 ? partnerA : partnerB;
+};
+
+const DateHistory = () => {
+  const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchHistory = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/get-history");
+      const data = await response.json();
+      if (data.success && data.history) {
+        setHistory(data.history);
+      }
+    } catch (error) {
+      console.error("Error fetching history:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800 mx-auto"></div>
+        <p className="mt-2 text-sm text-gray-600">טוען היסטוריה...</p>
+      </div>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Clock className="mx-auto h-8 w-8 mb-2 opacity-50" />
+        <p>אין היסטוריית דייטים עדיין</p>
+        <p className="text-sm">דייטים שתתכננו יופיעו כאן</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {history.map((date) => (
+        <div key={date.week} className="bg-white rounded-lg shadow p-4">
+          <div className="flex justify-between items-center mb-2">
+            <Badge
+              variant={date.isPlanned ? "default" : "outline"}
+              className={cn(
+                "px-2 py-1",
+                date.isPlanned && "bg-[#34C759] hover:bg-[#34C759]/90",
+                !date.isPlanned &&
+                  "bg-red-500 hover:bg-red-600 text-white border-0"
+              )}
+            >
+              {date.isPlanned ? "מתוכנן" : "לא מתוכנן"}
+            </Badge>
+            <span className="text-sm text-gray-500">שבוע {date.week}</span>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <h4 className="text-sm font-medium text-gray-500">פרטי הדייט</h4>
+              <p className="text-base">{date.dateDetails}</p>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium text-gray-500">מיקום</h4>
+              <p className="text-base">{date.location}</p>
+            </div>
+
+            <div className="flex justify-between items-center text-sm text-gray-500">
+              <span>
+                תוכנן על ידי:{" "}
+                {getPlanner(date.week, date.partnerA, date.partnerB)}
+              </span>
+              <span>
+                {new Date(date.createdAt).toLocaleDateString("he-IL")}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 export function DatePlanner() {
@@ -70,6 +167,9 @@ export function DatePlanner() {
   const [isIOS, setIsIOS] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
   const [currentPlanner, setCurrentPlanner] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   // Load current week's date from database
   useEffect(() => {
@@ -160,6 +260,16 @@ export function DatePlanner() {
     }
 
     try {
+      setIsLoading(true);
+      // Check if a date already exists for this week
+      const checkResponse = await fetch(`/api/get-planner?week=${currentWeek}`);
+      const checkData = await checkResponse.json();
+
+      if (checkData.date && checkData.date.isPlanned) {
+        setErrorMessage("כבר קיים דייט מתוכנן לשבוע זה");
+        return;
+      }
+
       console.log("Attempting to save date to database...");
       const dateData = {
         week: currentWeek,
@@ -201,18 +311,64 @@ export function DatePlanner() {
       // Success message
       setSuccessMessage("הדייט תוכנן בהצלחה! 🎉");
     } catch (error) {
-      console.error("Detailed error in handleMarkPlanned:", error);
+      console.error("Error in handleMarkPlanned:", error);
       console.error("Error stack:", error.stack);
       setErrorMessage(`שגיאה בשמירת המתכנן: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleMarkUnplanned = () => {
-    setIsPlanned(false);
-    setPlanningHistory((prev) => ({
-      ...prev,
-      [currentWeek]: false,
-    }));
+  const handleMarkUnplanned = async () => {
+    try {
+      setIsCancelling(true);
+      const response = await fetch("/api/save-planner", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          week: currentWeek,
+          isPlanned: false,
+          dateDetails: "",
+          location: "",
+          partnerA,
+          partnerB,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to unmark date");
+      }
+
+      // Send cancellation email
+      const emailResponse = await fetch("/api/send-cancellation-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          week: currentWeek,
+          partnerA,
+          partnerB,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        console.error("Failed to send cancellation email");
+      }
+
+      setIsPlanned(false);
+      setDateDetails("");
+      setDateLocation("");
+      setIsSurpriseLocation(false);
+      setSuccessMessage("הדייט בוטל בהצלחה");
+    } catch (error) {
+      console.error("Error unmarking date:", error);
+      setErrorMessage("שגיאה בביטול הדייט");
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const handlePartnerNameChange = (partner, name) => {
@@ -402,9 +558,18 @@ export function DatePlanner() {
     });
   };
 
+  const handleCancelClick = () => {
+    setShowCancelDialog(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    setShowCancelDialog(false);
+    await handleMarkUnplanned();
+  };
+
   return (
     <>
-      <div className="container mx-auto p-4 max-w-2xl">
+      <div className="container mx-auto p-4 max-w-2xl rtl">
         {/* Error Message */}
         {errorMessage && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -493,29 +658,6 @@ export function DatePlanner() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg">
-                <div className="flex items-center">
-                  {notificationsEnabled ? (
-                    <Bell className="ml-2 h-5 w-5" />
-                  ) : (
-                    <BellOff className="ml-2 h-5 w-5" />
-                  )}
-                  <div>
-                    <h3 className="text-sm font-medium">התראות</h3>
-                    <p className="text-xs text-slate-500">
-                      {isPWA
-                        ? "קבל התראות על דייטים"
-                        : "קבל התראות (מומלץ להתקין את האפליקציה)"}
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={notificationsEnabled}
-                  onCheckedChange={toggleNotifications}
-                  aria-label="Toggle notifications"
-                />
-              </div>
-
               <div>
                 <label
                   htmlFor="dateDetails"
@@ -529,6 +671,7 @@ export function DatePlanner() {
                   value={dateDetails}
                   onChange={handleDateDetailsChange}
                   className="w-full p-2 border rounded-md text-right min-h-[100px]"
+                  dir="rtl"
                 />
               </div>
 
@@ -560,6 +703,7 @@ export function DatePlanner() {
                     onChange={(e) => setDateLocation(e.target.value)}
                     placeholder="איפה נפגשים?"
                     className="w-full p-2 border rounded-md text-right"
+                    dir="rtl"
                     disabled={isSurpriseLocation}
                   />
                 )}
@@ -570,16 +714,37 @@ export function DatePlanner() {
             {isPlanned ? (
               <Button
                 variant="outline"
-                onClick={handleMarkUnplanned}
-                className="w-full"
+                onClick={handleCancelClick}
+                className="w-full disabled:opacity-100 disabled:cursor-not-allowed"
+                disabled={isCancelling}
               >
-                <XCircle className="ml-2 h-4 w-4" />
-                סמן כלא מתוכנן
+                {isCancelling ? (
+                  <div className="flex items-center justify-center">
+                    <Loader />
+                  </div>
+                ) : (
+                  <>
+                    <XCircle className="ml-2 h-4 w-4" />
+                    בטל דייט
+                  </>
+                )}
               </Button>
             ) : (
-              <Button onClick={handleMarkPlanned} className="w-full">
-                <CheckCircle className="ml-2 h-4 w-4" />
-                סמן כמתוכנן
+              <Button
+                onClick={handleMarkPlanned}
+                className="w-full disabled:opacity-100 disabled:cursor-not-allowed"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <Loader />
+                  </div>
+                ) : (
+                  <>
+                    <CheckCircle className="ml-2 h-4 w-4" />
+                    סמן כמתוכנן
+                  </>
+                )}
               </Button>
             )}
           </CardFooter>
@@ -607,61 +772,45 @@ export function DatePlanner() {
 
           {showHistory && (
             <CardContent>
-              {historyWeeks.length > 0 ? (
-                <Accordion type="multiple" className="w-full">
-                  {historyWeeks.map((week) => (
-                    <AccordionItem value={`week-${week}`} key={week}>
-                      <AccordionTrigger className="py-2">
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center">
-                            <span className="font-medium">שבוע {week}</span>
-                            <Badge
-                              variant={
-                                planningHistory[week] ? "default" : "outline"
-                              }
-                              className={cn(
-                                "mr-2",
-                                planningHistory[week] &&
-                                  "bg-[#34C759] hover:bg-[#34C759]/90",
-                                !planningHistory[week] &&
-                                  "bg-red-500 hover:bg-red-600 text-white border-0"
-                              )}
-                            >
-                              {planningHistory[week] ? "מתוכנן" : "לא מתוכנן"}
-                            </Badge>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {getPlanner(week, partnerA, partnerB)}
-                          </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="bg-slate-50 p-3 rounded-md">
-                          {dateDetailsHistory[week] ? (
-                            <p className="whitespace-pre-wrap">
-                              {dateDetailsHistory[week]}
-                            </p>
-                          ) : (
-                            <p className="text-muted-foreground text-sm">
-                              אין פרטים על דייט זה
-                            </p>
-                          )}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Clock className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                  <p>אין היסטוריית דייטים עדיין</p>
-                  <p className="text-sm">דייטים שתתכננו יופיעו כאן</p>
-                </div>
-              )}
+              <DateHistory />
             </CardContent>
           )}
         </Card>
       </div>
+
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="sm:max-w-[425px] rtl">
+          <DialogHeader className="text-center">
+            <DialogTitle className="text-center">ביטול דייט</DialogTitle>
+            <DialogDescription className="text-center">
+              האם את/ה בטוח/ה שברצונך לבטל את הדייט?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-center gap-2 sm:justify-center">
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancel}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <div className="flex items-center justify-center">
+                  <Loader />
+                </div>
+              ) : (
+                <>אני בטוח/ה</>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowCancelDialog(false)}
+              disabled={isCancelling}
+            >
+              ביטול
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Toaster />
     </>
   );
