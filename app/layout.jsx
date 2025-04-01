@@ -2,6 +2,7 @@ import "@/app/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { RegisterSW } from "./register-sw";
 import { LoadingScreen } from "@/components/loading-screen";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata = {
   title: "יגאל & טלי",
@@ -57,6 +58,7 @@ export default function RootLayout({ children }) {
           <LoadingScreen />
           {children}
           <RegisterSW />
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

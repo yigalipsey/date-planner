@@ -1,323 +1,418 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Calendar, CheckCircle, XCircle, ChevronDown, ChevronUp, Clock, Bell, BellOff } from "lucide-react"
-import { Textarea } from "@/components/ui/textarea"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { useToast } from "@/hooks/use-toast"
-import { Switch } from "@/components/ui/switch"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Calendar,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Bell,
+  BellOff,
+} from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
 // Get the current week number
 const getCurrentWeek = () => {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), 0, 1)
-  const diff = now.getTime() - start.getTime()
-  const oneWeek = 604800000 // milliseconds in a week
-  return Math.ceil(diff / oneWeek)
-}
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const diff = now.getTime() - start.getTime();
+  const oneWeek = 604800000; // milliseconds in a week
+  return Math.ceil(diff / oneWeek);
+};
 
 // Determine who's planning based on week number
 const getPlanner = (weekNumber, partnerA, partnerB) => {
-  return weekNumber % 2 === 0 ? partnerA : partnerB
-}
+  return weekNumber % 2 === 0 ? partnerA : partnerB;
+};
 
 export function DatePlanner() {
-  const [partnerA, setPartnerA] = useState("יגאל")
-  const [partnerB, setPartnerB] = useState("טלי")
-  const [currentWeek, setCurrentWeek] = useState(getCurrentWeek())
-  const [isPlanned, setIsPlanned] = useState(false)
-  const [dateDetails, setDateDetails] = useState("")
-  const [planningHistory, setPlanningHistory] = useState({})
-  const [dateDetailsHistory, setDateDetailsHistory] = useState({})
-  const [showHistory, setShowHistory] = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
-  const [notificationPermission, setNotificationPermission] = useState("default")
-  const { toast } = useToast()
+  const [partnerA, setPartnerA] = useState("יגאל");
+  const [partnerB, setPartnerB] = useState("טלי");
+  const [currentWeek, setCurrentWeek] = useState(getCurrentWeek());
+  const [isPlanned, setIsPlanned] = useState(false);
+  const [dateDetails, setDateDetails] = useState("");
+  const [planningHistory, setPlanningHistory] = useState({});
+  const [dateDetailsHistory, setDateDetailsHistory] = useState({});
+  const [showHistory, setShowHistory] = useState(false);
+  const [dateLocation, setDateLocation] = useState("");
+  const [isSurpriseLocation, setIsSurpriseLocation] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] =
+    useState("default");
+  const [isIOS, setIsIOS] = useState(false);
+  const [isPWA, setIsPWA] = useState(false);
 
   // Load data from localStorage
   useEffect(() => {
-    const savedHistory = localStorage.getItem("datePlanningHistory")
-    const savedPartnerA = localStorage.getItem("partnerA")
-    const savedPartnerB = localStorage.getItem("partnerB")
-    const savedDateDetailsHistory = localStorage.getItem("dateDetailsHistory")
-    const savedNotificationsEnabled = localStorage.getItem("notificationsEnabled")
+    const savedHistory = localStorage.getItem("datePlanningHistory");
+    const savedPartnerA = localStorage.getItem("partnerA");
+    const savedPartnerB = localStorage.getItem("partnerB");
+    const savedDateDetailsHistory = localStorage.getItem("dateDetailsHistory");
+    const savedLocation = localStorage.getItem("dateLocation");
+    const savedIsSurpriseLocation = localStorage.getItem("isSurpriseLocation");
 
     if (savedHistory) {
-      setPlanningHistory(JSON.parse(savedHistory))
+      setPlanningHistory(JSON.parse(savedHistory));
     }
 
     if (savedPartnerA) {
-      setPartnerA(savedPartnerA)
+      setPartnerA(savedPartnerA);
     }
 
     if (savedPartnerB) {
-      setPartnerB(savedPartnerB)
+      setPartnerB(savedPartnerB);
     }
 
     if (savedDateDetailsHistory) {
-      setDateDetailsHistory(JSON.parse(savedDateDetailsHistory))
+      setDateDetailsHistory(JSON.parse(savedDateDetailsHistory));
     }
 
-    if (savedNotificationsEnabled) {
-      setNotificationsEnabled(JSON.parse(savedNotificationsEnabled))
+    if (savedLocation) {
+      setDateLocation(savedLocation);
+    }
+
+    if (savedIsSurpriseLocation) {
+      setIsSurpriseLocation(JSON.parse(savedIsSurpriseLocation));
     }
 
     // Check if current week is already planned and load date details
     if (savedHistory) {
-      const history = JSON.parse(savedHistory)
-      setIsPlanned(!!history[currentWeek])
+      const history = JSON.parse(savedHistory);
+      setIsPlanned(!!history[currentWeek]);
     }
 
     if (savedDateDetailsHistory) {
-      const detailsHistory = JSON.parse(savedDateDetailsHistory)
+      const detailsHistory = JSON.parse(savedDateDetailsHistory);
       if (detailsHistory[currentWeek]) {
-        setDateDetails(detailsHistory[currentWeek])
+        setDateDetails(detailsHistory[currentWeek]);
       } else {
-        setDateDetails("")
+        setDateDetails("");
       }
     }
-
-    // Check notification permission
-    if ("Notification" in window) {
-      setNotificationPermission(Notification.permission)
-    }
-  }, [currentWeek])
+  }, [currentWeek]);
 
   // Save planning history to localStorage
   useEffect(() => {
-    localStorage.setItem("datePlanningHistory", JSON.stringify(planningHistory))
-  }, [planningHistory])
+    localStorage.setItem(
+      "datePlanningHistory",
+      JSON.stringify(planningHistory)
+    );
+  }, [planningHistory]);
 
   // Save date details history to localStorage
   useEffect(() => {
-    localStorage.setItem("dateDetailsHistory", JSON.stringify(dateDetailsHistory))
-  }, [dateDetailsHistory])
+    localStorage.setItem(
+      "dateDetailsHistory",
+      JSON.stringify(dateDetailsHistory)
+    );
+  }, [dateDetailsHistory]);
 
   // Save partner names to localStorage
   useEffect(() => {
-    localStorage.setItem("partnerA", partnerA)
-    localStorage.setItem("partnerB", partnerB)
-  }, [partnerA, partnerB])
+    localStorage.setItem("partnerA", partnerA);
+    localStorage.setItem("partnerB", partnerB);
+  }, [partnerA, partnerB]);
 
-  // Save notifications setting to localStorage
+  // Save location to localStorage
   useEffect(() => {
-    localStorage.setItem("notificationsEnabled", JSON.stringify(notificationsEnabled))
-  }, [notificationsEnabled])
+    localStorage.setItem("dateLocation", dateLocation);
+  }, [dateLocation]);
 
-  // Handle notifications
   useEffect(() => {
-    // Check if we need to show a notification based on last notification time
-    const checkAndShowNotification = () => {
-      if (!notificationsEnabled || notificationPermission !== "granted") return
+    localStorage.setItem(
+      "isSurpriseLocation",
+      JSON.stringify(isSurpriseLocation)
+    );
+  }, [isSurpriseLocation]);
 
-      const lastNotificationTime = localStorage.getItem("lastNotificationTime")
-      const now = new Date().getTime()
-
-      // If no previous notification or it's been more than 3 days
-      if (!lastNotificationTime || now - Number.parseInt(lastNotificationTime) > 3 * 24 * 60 * 60 * 1000) {
-        const currentPlanner = getPlanner(currentWeek, partnerA, partnerB)
-
-        if (isPlanned) {
-          // Date is planned, show a reminder
-          showNotification(
-            "תזכורת לדייט",
-            `יש לכם דייט מתוכנן השבוע! ${dateDetails ? `\n${dateDetails.substring(0, 50)}${dateDetails.length > 50 ? "..." : ""}` : ""}`,
-          )
-        } else {
-          // Date is not planned, remind the planner
-          showNotification("תזכורת לתכנון דייט", `${currentPlanner}, זה התור שלך לתכנן את הדייט השבועי!`)
-        }
-
-        // Update last notification time
-        localStorage.setItem("lastNotificationTime", now.toString())
-      }
+  // Load notification settings
+  useEffect(() => {
+    const savedNotificationsEnabled = localStorage.getItem(
+      "notificationsEnabled"
+    );
+    if (savedNotificationsEnabled) {
+      setNotificationsEnabled(JSON.parse(savedNotificationsEnabled));
     }
 
-    // Check when the component mounts
-    checkAndShowNotification()
-
-    // Set up a check every time the app is focused
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkAndShowNotification()
-      }
+    if ("Notification" in window) {
+      setNotificationPermission(Notification.permission);
     }
+  }, []);
 
-    document.addEventListener("visibilitychange", handleVisibilityChange)
+  // Save notification settings
+  useEffect(() => {
+    localStorage.setItem(
+      "notificationsEnabled",
+      JSON.stringify(notificationsEnabled)
+    );
+  }, [notificationsEnabled]);
 
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
-  }, [notificationsEnabled, notificationPermission, isPlanned, dateDetails, currentWeek, partnerA, partnerB])
+  // Check if device is iOS
+  useEffect(() => {
+    const checkIsIOS = () => {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      return /iphone|ipad|ipod/.test(userAgent);
+    };
+    setIsIOS(checkIsIOS());
+  }, []);
 
-  const showNotification = (title, body) => {
-    if (!("Notification" in window)) {
-      console.log("This browser does not support notifications")
-      return
-    }
-
-    if (Notification.permission === "granted") {
-      const notification = new Notification(title, {
-        body: body,
-        icon: "/icons/android-chrome-192x192.png",
-      })
-
-      notification.onclick = () => {
-        window.focus()
-        notification.close()
-      }
-    }
-  }
-
-  const requestNotificationPermission = async () => {
-    if (!("Notification" in window)) {
-      toast({
-        title: "שגיאה",
-        description: "הדפדפן שלך לא תומך בהתראות",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      const permission = await Notification.requestPermission()
-      setNotificationPermission(permission)
-
-      if (permission === "granted") {
-        setNotificationsEnabled(true)
-        toast({
-          title: "התראות הופעלו",
-          description: "תקבל תזכורות על דייטים כל שלושה ימים",
-        })
-
-        // Show a test notification
-        showNotification("התראות הופעלו בהצלחה", "תקבל תזכורות על דייטים כל שלושה ימים")
-      } else {
-        toast({
-          title: "התראות לא הופעלו",
-          description: "אנא אשר התראות בדפדפן כדי לקבל תזכורות",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error requesting notification permission:", error)
-      toast({
-        title: "שגיאה",
-        description: "אירעה שגיאה בבקשת הרשאות להתראות",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const toggleNotifications = async () => {
-    if (notificationsEnabled) {
-      // Turn off notifications
-      setNotificationsEnabled(false)
-      toast({
-        title: "התראות כבויות",
-        description: "לא תקבל יותר תזכורות על דייטים",
-      })
-    } else {
-      // Turn on notifications
-      if (notificationPermission === "granted") {
-        setNotificationsEnabled(true)
-        toast({
-          title: "התראות הופעלו",
-          description: "תקבל תזכורות על דייטים כל שלושה ימים",
-        })
-      } else {
-        await requestNotificationPermission()
-      }
-    }
-  }
-
-  const currentPlanner = getPlanner(currentWeek, partnerA, partnerB)
+  // Check if running as PWA
+  useEffect(() => {
+    const checkIsPWA = () => {
+      return (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone ||
+        document.referrer.includes("android-app://")
+      );
+    };
+    setIsPWA(checkIsPWA());
+  }, []);
 
   const handleMarkPlanned = () => {
-    setIsPlanned(true)
+    if (!dateDetails.trim()) {
+      toast({
+        title: "שגיאה",
+        description: "יש להזין פרטי דייט לפני שמסמנים כמתוכנן",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isSurpriseLocation && !dateLocation.trim()) {
+      toast({
+        title: "שגיאה",
+        description: "יש להזין מיקום או לסמן כהפתעה",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPlanned(true);
     setPlanningHistory((prev) => ({
       ...prev,
       [currentWeek]: true,
-    }))
-  }
+    }));
+
+    toast({
+      title: "הדייט תוכנן בהצלחה! 🎉",
+      description: "פרטי הדייט נשמרו",
+    });
+  };
 
   const handleMarkUnplanned = () => {
-    setIsPlanned(false)
+    setIsPlanned(false);
     setPlanningHistory((prev) => ({
       ...prev,
       [currentWeek]: false,
-    }))
-  }
+    }));
+  };
 
   const handlePartnerNameChange = (partner, name) => {
     if (partner === "A") {
-      setPartnerA(name)
+      setPartnerA(name);
     } else {
-      setPartnerB(name)
+      setPartnerB(name);
     }
-  }
+  };
 
   const handleDateDetailsChange = (e) => {
-    const newDetails = e.target.value
-    setDateDetails(newDetails)
+    const newDetails = e.target.value;
+    setDateDetails(newDetails);
     setDateDetailsHistory((prev) => ({
       ...prev,
       [currentWeek]: newDetails,
-    }))
-  }
+    }));
+  };
 
   // Get history weeks (all weeks that have either planning status or date details)
   const getHistoryWeeks = () => {
-    const weeks = new Set()
+    const weeks = new Set();
 
     // Add weeks from planning history
     Object.keys(planningHistory).forEach((week) => {
-      weeks.add(Number.parseInt(week))
-    })
+      weeks.add(Number.parseInt(week));
+    });
 
     // Add weeks from date details history
     Object.keys(dateDetailsHistory).forEach((week) => {
-      weeks.add(Number.parseInt(week))
-    })
+      weeks.add(Number.parseInt(week));
+    });
 
     // Convert to array, sort in descending order (newest first), and filter out current week
     return Array.from(weeks)
       .filter((week) => week !== currentWeek)
-      .sort((a, b) => b - a)
-  }
+      .sort((a, b) => b - a);
+  };
 
-  const historyWeeks = getHistoryWeeks()
+  const historyWeeks = getHistoryWeeks();
+
+  const registerServiceWorker = async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("/sw.js");
+      console.log("Service Worker registered");
+      return registration;
+    } catch (error) {
+      console.error("Service Worker registration failed:", error);
+    }
+  };
+
+  const subscribeToPush = async (registration) => {
+    try {
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+
+      await fetch("/api/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ subscription }),
+      });
+
+      return subscription;
+    } catch (error) {
+      console.error("Error subscribing to push:", error);
+      throw error;
+    }
+  };
+
+  const toggleNotifications = async () => {
+    if (!notificationsEnabled) {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          const registration = await registerServiceWorker();
+          if (registration) {
+            await subscribeToPush(registration);
+            setNotificationsEnabled(true);
+            toast({
+              title: "התראות הופעלו",
+              description: "תקבל התראות על דייטים",
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error enabling notifications:", error);
+        toast({
+          title: "שגיאה בהפעלת התראות",
+          description: "אירעה שגיאה בהפעלת ההתראות. אנא נסה שוב.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      setNotificationsEnabled(false);
+      toast({
+        title: "התראות הושבתו",
+        description: "לא תקבל יותר התראות",
+      });
+    }
+  };
 
   return (
-    <>
+    <div className="container mx-auto p-4 max-w-2xl">
       <Card className="shadow-lg rtl mb-4">
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>שבוע {currentWeek}</CardTitle>
-            <Badge variant={isPlanned ? "default" : "outline"} className="mr-2">
-              {isPlanned ? "מתוכנן" : "לא מתוכנן"}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/notify")}
+                className="flex items-center gap-2"
+              >
+                <Bell className="h-4 w-4" />
+                שלח התראה
+              </Button>
+              <Badge
+                variant={isPlanned ? "default" : "outline"}
+                className={cn(
+                  "mr-2 px-4 py-1.5 text-base font-medium",
+                  isPlanned && "bg-[#34C759] hover:bg-[#34C759]/90",
+                  !isPlanned &&
+                    "bg-red-500 hover:bg-red-600 text-white border-0"
+                )}
+              >
+                {isPlanned ? "מתוכנן" : "לא מתוכנן"}
+              </Badge>
+            </div>
           </div>
           <CardDescription>
             <div className="flex items-center mt-2">
               <Calendar className="ml-2 h-4 w-4" />
-              <span>{new Date().toLocaleDateString("he-IL", { month: "long", day: "numeric", year: "numeric" })}</span>
+              <span>
+                {new Date().toLocaleDateString("he-IL", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
             </div>
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="bg-slate-50 p-4 rounded-lg">
-              <h3 className="text-sm font-medium text-slate-500 mb-1">מתכנן/ת השבוע</h3>
-              <p className="text-xl font-bold">{currentPlanner}</p>
+              <h3 className="text-sm font-medium text-slate-500 mb-1">
+                מתכנן/ת השבוע
+              </h3>
+              <p className="text-xl font-bold">
+                {getPlanner(currentWeek, partnerA, partnerB)}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg">
+              <div className="flex items-center">
+                {notificationsEnabled ? (
+                  <Bell className="ml-2 h-5 w-5" />
+                ) : (
+                  <BellOff className="ml-2 h-5 w-5" />
+                )}
+                <div>
+                  <h3 className="text-sm font-medium">התראות</h3>
+                  <p className="text-xs text-slate-500">קבל התראות על דייטים</p>
+                </div>
+              </div>
+              <Switch
+                checked={notificationsEnabled}
+                onCheckedChange={toggleNotifications}
+                aria-label="Toggle notifications"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="partnerA" className="text-sm font-medium text-slate-500 mb-1 block">
+                <label
+                  htmlFor="partnerA"
+                  className="text-sm font-medium text-slate-500 mb-1 block"
+                >
                   שם ראשון
                 </label>
                 <input
@@ -329,7 +424,10 @@ export function DatePlanner() {
                 />
               </div>
               <div>
-                <label htmlFor="partnerB" className="text-sm font-medium text-slate-500 mb-1 block">
+                <label
+                  htmlFor="partnerB"
+                  className="text-sm font-medium text-slate-500 mb-1 block"
+                >
                   שם שני
                 </label>
                 <input
@@ -343,7 +441,10 @@ export function DatePlanner() {
             </div>
 
             <div>
-              <label htmlFor="dateDetails" className="text-sm font-medium text-slate-500 mb-1 block">
+              <label
+                htmlFor="dateDetails"
+                className="text-sm font-medium text-slate-500 mb-1 block"
+              >
                 פרטי הדייט
               </label>
               <Textarea
@@ -355,25 +456,47 @@ export function DatePlanner() {
               />
             </div>
 
-            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                {notificationsEnabled ? <Bell className="ml-2 h-5 w-5" /> : <BellOff className="ml-2 h-5 w-5" />}
-                <div>
-                  <h3 className="text-sm font-medium">התראות</h3>
-                  <p className="text-xs text-slate-500">קבל תזכורות כל 3 ימים</p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium text-slate-500">
+                  מיקום הדייט
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="surpriseLocation" className="text-sm">
+                    הפתעה
+                  </Label>
+                  <Switch
+                    id="surpriseLocation"
+                    checked={isSurpriseLocation}
+                    onCheckedChange={(checked) => {
+                      setIsSurpriseLocation(checked);
+                      if (checked) {
+                        setDateLocation("");
+                      }
+                    }}
+                  />
                 </div>
               </div>
-              <Switch
-                checked={notificationsEnabled}
-                onCheckedChange={toggleNotifications}
-                aria-label="Toggle notifications"
-              />
+              {!isSurpriseLocation && (
+                <input
+                  type="text"
+                  value={dateLocation}
+                  onChange={(e) => setDateLocation(e.target.value)}
+                  placeholder="איפה נפגשים?"
+                  className="w-full p-2 border rounded-md text-right"
+                  disabled={isSurpriseLocation}
+                />
+              )}
             </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">
           {isPlanned ? (
-            <Button variant="outline" onClick={handleMarkUnplanned} className="w-full">
+            <Button
+              variant="outline"
+              onClick={handleMarkUnplanned}
+              className="w-full"
+            >
               <XCircle className="ml-2 h-4 w-4" />
               סמן כלא מתוכנן
             </Button>
@@ -391,8 +514,17 @@ export function DatePlanner() {
         <CardHeader className="pb-2">
           <CardTitle className="flex justify-between items-center">
             <span>היסטוריית דייטים</span>
-            <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)} className="p-1 h-auto">
-              {showHistory ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowHistory(!showHistory)}
+              className="p-1 h-auto"
+            >
+              {showHistory ? (
+                <ChevronUp className="h-5 w-5" />
+              ) : (
+                <ChevronDown className="h-5 w-5" />
+              )}
             </Button>
           </CardTitle>
         </CardHeader>
@@ -407,19 +539,36 @@ export function DatePlanner() {
                       <div className="flex items-center justify-between w-full">
                         <div className="flex items-center">
                           <span className="font-medium">שבוע {week}</span>
-                          <Badge variant={planningHistory[week] ? "default" : "outline"} className="mr-2">
+                          <Badge
+                            variant={
+                              planningHistory[week] ? "default" : "outline"
+                            }
+                            className={cn(
+                              "mr-2",
+                              planningHistory[week] &&
+                                "bg-[#34C759] hover:bg-[#34C759]/90",
+                              !planningHistory[week] &&
+                                "bg-red-500 hover:bg-red-600 text-white border-0"
+                            )}
+                          >
                             {planningHistory[week] ? "מתוכנן" : "לא מתוכנן"}
                           </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">{getPlanner(week, partnerA, partnerB)}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {getPlanner(week, partnerA, partnerB)}
+                        </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="bg-slate-50 p-3 rounded-md">
                         {dateDetailsHistory[week] ? (
-                          <p className="whitespace-pre-wrap">{dateDetailsHistory[week]}</p>
+                          <p className="whitespace-pre-wrap">
+                            {dateDetailsHistory[week]}
+                          </p>
                         ) : (
-                          <p className="text-muted-foreground text-sm">אין פרטים על דייט זה</p>
+                          <p className="text-muted-foreground text-sm">
+                            אין פרטים על דייט זה
+                          </p>
                         )}
                       </div>
                     </AccordionContent>
@@ -436,7 +585,6 @@ export function DatePlanner() {
           </CardContent>
         )}
       </Card>
-    </>
-  )
+    </div>
+  );
 }
-
