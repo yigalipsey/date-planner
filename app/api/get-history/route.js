@@ -1,32 +1,24 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
-export async function GET(request) {
+export const dynamic = "force-dynamic";
+
+export async function GET() {
   try {
-    console.log("Starting get-history endpoint");
     const { db } = await connectToDatabase();
     const collection = db.collection("dates");
 
-    // Get all dates from the main collection, sorted by week number (descending)
+    // Get all planned dates, sorted by week number in descending order
     const dates = await collection
-      .find({ isPlanned: true }) // Only get planned dates
-      .sort({ week: -1 }) // Sort by week number, newest first
+      .find({ status: "planned" })
+      .sort({ week: -1 })
       .toArray();
 
-    console.log(`Found ${dates.length} dates in history`);
-
-    return NextResponse.json({
-      success: true,
-      history: dates,
-    });
+    return NextResponse.json(dates);
   } catch (error) {
-    console.error("Error getting history:", error);
+    console.error("Error fetching history:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to get history",
-        details: error.message,
-      },
+      { error: "Failed to fetch date history" },
       { status: 500 }
     );
   }
