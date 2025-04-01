@@ -12,10 +12,19 @@ export async function GET(request) {
       });
     }
 
-    const { db } = await connectToDatabase();
-    const collection = db.collection("dates");
+    // Add timeout to the database operation
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Database operation timed out")), 8000)
+    );
 
-    const date = await collection.findOne({ week: week });
+    const dbOperation = async () => {
+      const { db } = await connectToDatabase();
+      const collection = db.collection("dates");
+      return await collection.findOne({ week: week });
+    };
+
+    // Race between the database operation and timeout
+    const date = await Promise.race([dbOperation(), timeoutPromise]);
 
     return Response.json({
       success: true,
@@ -23,9 +32,14 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error("Error in get-planner:", error);
+    const errorMessage =
+      error.message === "Database operation timed out"
+        ? "Request timed out - please try again"
+        : error.message || "Failed to fetch date";
+
     return Response.json({
       success: false,
-      message: error.message || "Failed to fetch date",
+      message: errorMessage,
     });
   }
 }
