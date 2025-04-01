@@ -218,11 +218,12 @@ export function DatePlanner() {
       [currentWeek]: true,
     }));
 
-    // Show local notification when date is planned
+    // Show local notification after 3 seconds
     if (notificationsEnabled) {
       showLocalNotification(
         "דייט חדש תוכנן! 🎉",
-        `${getPlanner(currentWeek, partnerA, partnerB)} תכנן/ה דייט חדש`
+        `${getPlanner(currentWeek, partnerA, partnerB)} תכנן/ה דייט חדש`,
+        3000 // 3 seconds delay
       );
     }
 
@@ -357,56 +358,20 @@ export function DatePlanner() {
         if (permission === "granted") {
           const registration = await registerServiceWorker();
           if (registration) {
-            // Show immediate local notification
-            await registration.showNotification("התראות הופעלו! 🎉", {
-              body: "מעכשיו תקבל/י התראות על דייטים חדשים",
-              icon: "/icons/android-chrome-192x192.png",
-              badge: "/icons/notification-badge.png",
-              vibrate: [200, 100, 200],
-              tag: "welcome",
-              requireInteraction: true,
-              actions: [
-                {
-                  action: "open",
-                  title: "פתח אפליקציה",
-                },
-              ],
-              data: {
-                url: window.location.origin,
-              },
-            });
-
-            // Only try to subscribe to push if not on iOS
-            if (!isIOS) {
-              try {
-                await subscribeToPush(registration);
-              } catch (error) {
-                console.log(
-                  "Push subscription failed, but notifications still enabled:",
-                  error
-                );
-              }
-            }
+            // Show test notification after 2 seconds
+            showLocalNotification(
+              "התראות הופעלו! 🎉",
+              "בדיקה: תקבל/י את ההתראה הזו תוך 2 שניות",
+              2000 // 2 seconds delay
+            );
 
             setNotificationsEnabled(true);
             setNotificationPermission("granted");
 
             toast({
               title: "התראות הופעלו",
-              description: isIOS
-                ? "תקבל/י התראות כשהאפליקציה פתוחה"
-                : "תקבל/י התראות על דייטים חדשים",
+              description: "תקבל/י התראות על דייטים חדשים",
             });
-
-            // Show iOS specific message
-            if (isIOS) {
-              toast({
-                title: "שים לב",
-                description:
-                  "ב-iOS התראות יעבדו רק כשהאפליקציה פתוחה. מומלץ להוסיף תזכורת ביומן.",
-                duration: 5000,
-              });
-            }
           }
         } else {
           toast({
@@ -435,8 +400,13 @@ export function DatePlanner() {
   };
 
   // Function to show local notification
-  const showLocalNotification = async (title, body) => {
+  const showLocalNotification = async (title, body, delay = 0) => {
     if (!notificationsEnabled) return;
+
+    // Wait for the specified delay
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
 
     const registration = await navigator.serviceWorker.ready;
     await registration.showNotification(title, {
