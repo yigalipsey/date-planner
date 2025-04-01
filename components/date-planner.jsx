@@ -621,7 +621,10 @@ export function DatePlanner() {
         <Card className="shadow-lg rtl mb-4">
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle>שבוע {currentWeek}</CardTitle>
+              <div className="flex items-center">
+                <Calendar className="ml-2 h-4 w-4" />
+                <span>שבוע {currentWeek}</span>
+              </div>
               <Badge
                 variant={isPlanned ? "default" : "outline"}
                 className={cn(
@@ -636,7 +639,6 @@ export function DatePlanner() {
             </div>
             <CardDescription>
               <div className="flex items-center mt-2">
-                <Calendar className="ml-2 h-4 w-4" />
                 <span>
                   {new Date().toLocaleDateString("he-IL", {
                     month: "long",
@@ -780,13 +782,15 @@ export function DatePlanner() {
 
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent className="sm:max-w-[425px] rtl">
-          <DialogHeader className="text-center">
-            <DialogTitle className="text-center">ביטול דייט</DialogTitle>
+          <DialogHeader className="text-center space-y-2 pb-2">
+            <DialogTitle className="text-center text-lg">
+              ביטול דייט
+            </DialogTitle>
             <DialogDescription className="text-center">
               האם את/ה בטוח/ה שברצונך לבטל את הדייט?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex justify-center gap-2 sm:justify-center">
+          <DialogFooter className="flex justify-center gap-2 sm:justify-center pt-2">
             <Button
               variant="destructive"
               onClick={handleConfirmCancel}

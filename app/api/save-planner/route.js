@@ -49,13 +49,13 @@ export async function POST(request) {
     // Send email notification for new or updated dates
     if (result.upsertedCount > 0 || result.modifiedCount > 0) {
       try {
-        const emailResult = await sendDateNotificationEmail(
+        await sendDateNotificationEmail(
           dateDetails,
           partnerA,
           partnerB,
-          week
+          week,
+          location
         );
-        console.log("Email notification result:", emailResult);
       } catch (emailError) {
         console.error("Error sending email notification:", emailError);
         // Don't fail the request if email fails
