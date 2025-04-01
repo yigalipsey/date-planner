@@ -1,0 +1,17 @@
+{
+  "name": "Yigal and Tali",
+  "short_name": "Y&T",
+  "description": "Yigal and Tali's Date Planner",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icons/logoyigalandtali.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
