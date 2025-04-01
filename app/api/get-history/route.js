@@ -14,11 +14,17 @@ export async function GET() {
       .sort({ week: -1 })
       .toArray();
 
-    return NextResponse.json(dates);
+    return NextResponse.json({
+      success: true,
+      history: dates,
+    });
   } catch (error) {
     console.error("Error fetching history:", error);
     return NextResponse.json(
-      { error: "Failed to fetch date history" },
+      {
+        success: false,
+        error: "Failed to fetch date history",
+      },
       { status: 500 }
     );
   }

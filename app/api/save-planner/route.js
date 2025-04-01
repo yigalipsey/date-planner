@@ -1,84 +1,53 @@
+import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { sendDateNotificationEmail } from "@/lib/email";
 
-export async function POST(req) {
-  try {
-    const { week, dateDetails, location, isPlanned, partnerA, partnerB } =
-      await req.json();
+export const dynamic = "force-dynamic";
 
-    if (!week) {
-      return Response.json({
-        success: false,
-        message: "Week parameter is required",
-      });
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { week, dateDetails, location, partnerA, partnerB } = body;
+
+    if (!week || !dateDetails || !location) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     const { db } = await connectToDatabase();
     const collection = db.collection("dates");
 
-    // Update or insert the date
-    const result = await collection.updateOne(
-      { week: week },
-      {
-        $set: {
-          dateDetails,
-          location,
-          isPlanned,
-          partnerA,
-          partnerB,
-          updatedAt: new Date(),
-        },
-        $setOnInsert: {
-          createdAt: new Date(),
-        },
-      },
-      { upsert: true }
-    );
-
-    // Send email notification for new or updated dates
-    if (result.upsertedCount > 0 || result.modifiedCount > 0) {
-      try {
-        await sendDateNotificationEmail(
-          dateDetails,
-          partnerA,
-          partnerB,
-          week,
-          location
-        );
-      } catch (emailError) {
-        console.error("Error sending email notification:", emailError);
-      }
+    // Check if a date already exists for this week
+    const existingDate = await collection.findOne({ week: parseInt(week) });
+    if (existingDate) {
+      return NextResponse.json(
+        { error: "A date already exists for this week" },
+        { status: 400 }
+      );
     }
 
-    // Save to history collection
-    const historyCollection = db.collection("dates_history");
-    await historyCollection.insertOne({
-      week,
+    // Create new date document
+    const date = {
+      week: parseInt(week),
       dateDetails,
       location,
-      isPlanned,
       partnerA,
       partnerB,
+      status: "planned",
       createdAt: new Date(),
-    });
+    };
 
-    return Response.json({
-      success: true,
-      message: "Date saved successfully",
-      date: {
-        week,
-        dateDetails,
-        location,
-        isPlanned,
-        partnerA,
-        partnerB,
-      },
-    });
+    // Save to database
+    await collection.insertOne(date);
+
+    // Send email notification
+    await sendDateNotificationEmail(date);
+
+    return NextResponse.json({ success: true, date });
   } catch (error) {
-    console.error("Error in save-planner:", error);
-    return Response.json({
-      success: false,
-      message: error.message || "Failed to save date",
-    });
+    console.error("Error saving date:", error);
+    return NextResponse.json({ error: "Failed to save date" }, { status: 500 });
   }
 }
