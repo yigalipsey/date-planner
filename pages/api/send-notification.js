@@ -39,60 +39,69 @@ export default async function handler(req, res) {
       });
     }
 
-    const notificationPromises = [];
-    const expiredSubscriptions = [];
+    const results = [];
 
     // Try to send notification to each subscription
     for (const { _id, subscription } of subscriptions) {
       try {
-        console.log("Sending notification to subscription:", _id);
-        await webpush.sendNotification(
-          subscription,
-          JSON.stringify({
-            title,
-            body: message,
-            icon: "/icons/android-chrome-192x192.png",
-            badge: "/icons/notification-badge.png",
-            vibrate: [200, 100, 200],
-            tag: "date-planner",
-            actions: [
-              {
-                action: "open",
-                title: "פתח אפליקציה",
-              },
-            ],
-          })
+        console.log("Attempting to send to subscription:", _id.toString());
+        console.log(
+          "Subscription details:",
+          JSON.stringify(subscription, null, 2)
         );
-        console.log("Successfully sent notification to:", _id);
+
+        const payload = JSON.stringify({
+          title,
+          body: message,
+          icon: "/icons/android-chrome-192x192.png",
+          badge: "/icons/notification-badge.png",
+          vibrate: [200, 100, 200],
+          tag: "date-planner",
+          actions: [
+            {
+              action: "open",
+              title: "פתח אפליקציה",
+            },
+          ],
+          data: {
+            url: "https://date-planner-yigal.vercel.app/", // Add your app URL here
+          },
+        });
+
+        await webpush.sendNotification(subscription, payload);
+        console.log("Successfully sent notification to:", _id.toString());
+        results.push({ id: _id.toString(), status: "success" });
       } catch (error) {
+        console.error(
+          `Error sending notification to ${_id.toString()}:`,
+          error.message,
+          error.statusCode
+        );
+        results.push({
+          id: _id.toString(),
+          status: "error",
+          code: error.statusCode,
+          message: error.message,
+        });
+
         if (error.statusCode === 410) {
-          console.log("Subscription expired for:", _id);
-          expiredSubscriptions.push(_id);
-        } else {
-          console.error(
-            "Error sending notification to " + _id + ":",
-            error.message
-          );
+          console.log("Subscription expired for:", _id.toString());
+          await Subscription.deleteOne({ _id });
         }
       }
     }
 
-    // Remove expired subscriptions
-    if (expiredSubscriptions.length > 0) {
-      console.log(
-        `Removing ${expiredSubscriptions.length} expired subscriptions`
-      );
-      await Subscription.deleteMany({ _id: { $in: expiredSubscriptions } });
-    }
-
-    const successCount = subscriptions.length - expiredSubscriptions.length;
-    console.log(`Successfully sent ${successCount} notifications`);
+    const successful = results.filter((r) => r.status === "success").length;
+    const failed = results.filter((r) => r.status === "error").length;
 
     res.status(200).json({
       message: "Notifications processed",
-      sent: successCount,
-      expired: expiredSubscriptions.length,
-      total: subscriptions.length,
+      results,
+      summary: {
+        total: subscriptions.length,
+        successful,
+        failed,
+      },
     });
   } catch (error) {
     console.error("Error in notification process:", error);

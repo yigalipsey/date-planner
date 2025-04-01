@@ -283,10 +283,17 @@ export function DatePlanner() {
 
   const subscribeToPush = async (registration) => {
     try {
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        throw new Error("VAPID public key is missing");
+      }
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+        applicationServerKey: vapidPublicKey,
       });
+
+      console.log("Push subscription:", subscription);
 
       // Save subscription to server
       const response = await fetch("/api/subscribe", {
@@ -337,33 +344,38 @@ export function DatePlanner() {
 
   const toggleNotifications = async () => {
     if (!notificationsEnabled) {
-      if (!isPWA) {
-        toast({
-          title: "המלצה",
-          description:
-            "להתראות אמינות יותר, מומלץ להתקין את האפליקציה למסך הבית",
-          duration: 5000,
-        });
-      }
-
       try {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
           const registration = await registerServiceWorker();
           if (registration) {
             await subscribeToPush(registration);
-            // Wait a moment for the subscription to be properly saved
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            await sendTestNotification();
+
+            // Show immediate test notification using the service worker
+            await registration.showNotification("התראות הופעלו! 🎉", {
+              body: "מעכשיו תקבל/י התראות על דייטים חדשים",
+              icon: "/icons/android-chrome-192x192.png",
+              badge: "/icons/notification-badge.png",
+              vibrate: [200, 100, 200],
+              tag: "welcome",
+              requireInteraction: true,
+              actions: [
+                {
+                  action: "open",
+                  title: "פתח אפליקציה",
+                },
+              ],
+              data: {
+                url: window.location.origin,
+              },
+            });
 
             setNotificationsEnabled(true);
             setNotificationPermission("granted");
 
             toast({
               title: "התראות הופעלו",
-              description: isPWA
-                ? "תקבל התראות על דייטים"
-                : "תקבל התראות על דייטים כל עוד הדפדפן פתוח",
+              description: "תקבל/י התראות על דייטים חדשים",
             });
           }
         } else {
@@ -377,7 +389,8 @@ export function DatePlanner() {
         console.error("Error enabling notifications:", error);
         toast({
           title: "שגיאה בהפעלת התראות",
-          description: "אירעה שגיאה בהפעלת ההתראות. אנא נסה שוב.",
+          description:
+            error.message || "אירעה שגיאה בהפעלת ההתראות. אנא נסה שוב.",
           variant: "destructive",
         });
         setNotificationsEnabled(false);
