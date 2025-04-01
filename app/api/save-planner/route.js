@@ -6,6 +6,13 @@ export async function POST(req) {
     const { week, dateDetails, location, isPlanned, partnerA, partnerB } =
       await req.json();
 
+    if (!week) {
+      return Response.json({
+        success: false,
+        message: "Week parameter is required",
+      });
+    }
+
     const { db } = await connectToDatabase();
     const collection = db.collection("dates");
 
@@ -58,15 +65,20 @@ export async function POST(req) {
     return Response.json({
       success: true,
       message: "Date saved successfully",
+      date: {
+        week,
+        dateDetails,
+        location,
+        isPlanned,
+        partnerA,
+        partnerB,
+      },
     });
   } catch (error) {
     console.error("Error in save-planner:", error);
-    return Response.json(
-      {
-        success: false,
-        error: "Failed to save date",
-      },
-      { status: 500 }
-    );
+    return Response.json({
+      success: false,
+      message: error.message || "Failed to save date",
+    });
   }
 }

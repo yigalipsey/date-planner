@@ -6,19 +6,16 @@ export async function GET(request) {
     const week = parseInt(searchParams.get("week"));
 
     if (!week) {
-      return Response.json(
-        {
-          success: false,
-          error: "Week parameter is required",
-        },
-        { status: 400 }
-      );
+      return Response.json({
+        success: false,
+        message: "Week parameter is required",
+      });
     }
 
     const { db } = await connectToDatabase();
     const collection = db.collection("dates");
 
-    const date = await collection.findOne({ week });
+    const date = await collection.findOne({ week: week });
 
     return Response.json({
       success: true,
@@ -26,12 +23,9 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error("Error in get-planner:", error);
-    return Response.json(
-      {
-        success: false,
-        error: "Failed to fetch date",
-      },
-      { status: 500 }
-    );
+    return Response.json({
+      success: false,
+      message: error.message || "Failed to fetch date",
+    });
   }
 }
